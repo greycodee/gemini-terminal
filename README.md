@@ -1,3 +1,3 @@
 # gemini-terminal
 
-![](./628565.gif)
+![](./628566.gif)
