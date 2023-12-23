@@ -1,38 +1,41 @@
 # Gemini Terminal
 [[English]](./README.md) [[中文]](./README_zh.md) [[日本語]](./README_jp.md)
 
-Gemini Terminal is a chat application based on Google AI. You can use it by following the steps below.
+Gemini Terminal是一个基于Google AI的终端聊天应用。你可以通过以下步骤来使用它。
 
-![](./628566.gif)
+![Gemini Terminal](./628566.gif)
 
-## Installation and Usage
-1. Clone this repository
+## 安装与使用
+
+1. 克隆这个项目
 
 ```bash
 git clone https://github.com/greycodee/gemini-terminal.git
 ```
 
-2. Build the project
+2. 构建项目
 
 ```bash
 cd gemini-terminal && go build .
 ```
 
-3. Run the project
+3. 运行项目
 
 ```bash
 ./gemini-terminal
 ```
 
-> Note: You need to set your own Google AI key in the `$HOME/.local/share/gemini/config.ini` file.
+> 注意: 你需要在 `$HOME/.local/share/gemini/config.ini` 文件中设置你自己的Google AI密钥。
 
-## Configuration
-The default configuration file is located at `$HOME/.local/share/gemini/config.ini`. You can set your Google AI key and Gemini model name in this file.
+## 配置
+
+默认的配置文件位于 `$HOME/.local/share/gemini/config.ini`，你可以在这个文件中设置你的Google AI密钥和Gemini模型名称。
+
 ```ini
 [Gemini]
-# set your own google ai key
+# 设置你自己的Google AI密钥
 googleAIKey=
-# set gemini model name
+# 设置Gemini模型名称
 model=gemini-pro
 [SafetySetting]
 # HarmBlockUnspecified HarmBlockThreshold = 0
@@ -47,6 +50,6 @@ model=gemini-pro
 level=4
 ```
 
-## Chat History
-The default database file is located at `$HOME/.local/share/gemini/gemini.db`. You can view your chat history in this file.
+## 聊天历史
 
+默认的数据库文件位于 `$HOME/.local/share/gemini/gemini.db`，你可以在这个文件中查看你的聊天历史。
