@@ -1,13 +1,13 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
-	"strings"
+
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -30,6 +30,11 @@ func init() {
 }
 
 func main() {
+	sendMsgChan := make(chan string)
+	historyChan := make(chan string)
+
+	app := tview.NewApplication()
+
 	ctx := context.Background()
 	db := initDB()
 	defer db.SqliteDB.Close()
@@ -45,12 +50,46 @@ func main() {
 	geminiClient.startChat(history)
 	defer geminiClient.client.Close()
 
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("\x1b[31mQ: ")
-		text, _ := reader.ReadString('\n')
-		fmt.Print("\x1b[0m")
-		text = strings.Replace(text, "\n", "", -1)
-		geminiClient.sendMessageStreamAndPrint(text, db)
+	go geminiClient.sendMessageToTui(sendMsgChan, historyChan, db)
+
+	chatLog := tview.NewTextView().
+		SetDynamicColors(true).
+		SetRegions(true)
+	chatLog.SetChangedFunc(func() {
+		app.Draw()
+		chatLog.ScrollToEnd()
+	})
+	go func() {
+		for {
+			history := <-historyChan
+			app.QueueUpdateDraw(func() {
+				chatLog.Write([]byte(history))
+				// chatLog.SetText(chatLog.GetText(true) + history)
+			})
+		}
+	}()
+
+	// 创建一个输入框用于输入消息
+	inputField := tview.NewInputField().
+		SetLabel("Enter message: ").
+		SetFieldWidth(0)
+
+	// 设置完成函数以处理消息提交
+	inputField.SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEnter {
+			sendMsgChan <- inputField.GetText()
+			inputField.SetText("")
+		}
+	})
+
+	// spinner := tview.NewSpinner('⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷')
+	// 创建一个Flex布局，并设置聊天记录框和输入框的比例为8:1
+	flex := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(chatLog, 0, 8, false).
+		AddItem(inputField, 1, 2, true)
+
+	if err := app.SetRoot(flex, true).Run(); err != nil {
+		panic(err)
 	}
 }
