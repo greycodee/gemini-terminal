@@ -32,6 +32,7 @@ func init() {
 func main() {
 	sendMsgChan := make(chan string)
 	historyChan := make(chan string)
+	genFlagChan := make(chan bool)
 
 	app := tview.NewApplication()
 
@@ -50,7 +51,7 @@ func main() {
 	geminiClient.startChat(history)
 	defer geminiClient.client.Close()
 
-	go geminiClient.sendMessageToTui(sendMsgChan, historyChan, db)
+	go geminiClient.sendMessageToTui(sendMsgChan, historyChan, genFlagChan, db)
 
 	chatLog := tview.NewTextView().
 		SetDynamicColors(true).
@@ -74,14 +75,23 @@ func main() {
 		SetLabel("Enter message: ").
 		SetFieldWidth(0)
 
+		// inputField.SetFieldBackgroundColor(tview.Styles.PrimitiveBackgroundColor).SetEnabled(false)
+
 	// 设置完成函数以处理消息提交
 	inputField.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
 			sendMsgChan <- inputField.GetText()
 			inputField.SetText("")
+			genFlagChan <- true
 		}
 	})
 
+	go func() {
+		for {
+			flag := <-genFlagChan
+			inputField.SetDisabled(flag)
+		}
+	}()
 	// spinner := tview.NewSpinner('⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷')
 	// 创建一个Flex布局，并设置聊天记录框和输入框的比例为8:1
 	flex := tview.NewFlex().

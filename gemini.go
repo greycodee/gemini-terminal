@@ -51,7 +51,7 @@ func (g *GeminiClient) sendMessageStream(text string) *genai.GenerateContentResp
 	return iter
 }
 
-func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan string, db *DB) {
+func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan string, genFlagChan chan bool, db *DB) {
 	for {
 		text := <-textChan
 		historyChan <- "[red]Q:" + text + "\n"
@@ -95,6 +95,7 @@ func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan s
 			}
 		}
 		historyChan <- "\n"
+		genFlagChan <- false
 		modelArr, err := json.Marshal(modelPart)
 		if err != nil {
 			log.Fatal(err)
