@@ -54,3 +54,7 @@ level=4
 ## Chat History
 
 The default database file is located at `$HOME/.local/share/gemini/gemini.db`. You can view your chat history in this file.
+
+## TODO
+
+- [ ] Support Chat List
