@@ -77,7 +77,7 @@ func (g *GeminiClient) genTitle() string {
 	return strings.ReplaceAll(strings.Join(modelPart, ""), "*", "")
 }
 
-func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan string, genFlagChan chan bool, db *DB) {
+func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan string, genFlagChan chan bool, titleChan chan string, db *DB) {
 	firstQuestion := true
 	for {
 		text := <-textChan
@@ -141,6 +141,7 @@ func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan s
 			firstQuestion = false
 			go func() {
 				title := g.genTitle()
+				titleChan <- title
 				db.InsertChat(GeminiChatList{
 					ChatID:    int64(g.chatID),
 					ChatTitle: title,
