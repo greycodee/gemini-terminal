@@ -1,9 +1,10 @@
 # Gemini Terminal
+
 [[English]](./README.md) [[中文]](./README_zh.md) [[日本語]](./README_jp.md)
 
-Gemini Terminal是一个基于Google AI的终端聊天应用。你可以通过以下步骤来使用它。
+Gemini Terminal 是一个基于 Google AI 的终端聊天应用。你可以通过以下步骤来使用它。
 
-![Gemini Terminal](./628566.gif)
+![](./tui.png)
 
 ## 安装与使用
 
@@ -25,11 +26,11 @@ cd gemini-terminal && go build .
 ./gemini-terminal
 ```
 
-> 注意: 你需要在 `$HOME/.local/share/gemini/config.ini` 文件中设置你自己的Google AI密钥。
+> 注意: 你需要在 `$HOME/.local/share/gemini/config.ini` 文件中设置你自己的 Google AI 密钥。
 
 ## 配置
 
-默认的配置文件位于 `$HOME/.local/share/gemini/config.ini`，你可以在这个文件中设置你的Google AI密钥和Gemini模型名称。
+默认的配置文件位于 `$HOME/.local/share/gemini/config.ini`，你可以在这个文件中设置你的 Google AI 密钥和 Gemini 模型名称。
 
 ```ini
 [Gemini]

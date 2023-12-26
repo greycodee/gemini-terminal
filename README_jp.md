@@ -1,11 +1,13 @@
 # Gemini Terminal
+
 [[English]](./README.md) [[中文]](./README_zh.md) [[日本語]](./README_jp.md)
 
-Gemini TerminalはGoogle AIに基づくチャットアプリケーションです。以下の手順で使用することができます。
+Gemini Terminal は Google AI に基づくチャットアプリケーションです。以下の手順で使用することができます。
 
-![](./628566.gif)
+![](./tui.png)
 
 ## インストールと使用方法
+
 1. このリポジトリをクローンします
 
 ```bash
@@ -24,10 +26,12 @@ cd gemini-terminal && go build .
 ./gemini-terminal
 ```
 
-> 注意: `$HOME/.local/share/gemini/config.ini` ファイルで自分のGoogle AIキーを設定する必要があります。
+> 注意: `$HOME/.local/share/gemini/config.ini` ファイルで自分の Google AI キーを設定する必要があります。
 
 ## 設定
-デフォルトの設定ファイルは `$HOME/.local/share/gemini/config.ini` にあります。このファイルでGoogle AIキーとGeminiモデル名を設定することができます。
+
+デフォルトの設定ファイルは `$HOME/.local/share/gemini/config.ini` にあります。このファイルで Google AI キーと Gemini モデル名を設定することができます。
+
 ```ini
 [Gemini]
 # 自分のGoogle AIキーを設定します
@@ -48,4 +52,5 @@ level=4
 ```
 
 ## チャット履歴
+
 デフォルトのデータベースファイルは `$HOME/.local/share/gemini/gemini.db` にあります。このファイルでチャット履歴を見ることができます。
