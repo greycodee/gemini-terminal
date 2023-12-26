@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/iterator"
@@ -51,28 +52,10 @@ func (g *GeminiClient) sendMessageStream(text string) *genai.GenerateContentResp
 	return iter
 }
 
-func (g *GeminiClient) sendMessageStreamAndPrint(text string, db *DB) {
-	tx, err := db.SqliteDB.Begin()
-	if err != nil {
-		log.Fatal(err)
-	}
-	userPromptArr := []string{text}
-	jarr, err := json.Marshal(userPromptArr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = db.InsertHistoryWithTX(tx, GeminiChatHistory{
-		ChatID: int64(g.chatID),
-		Prompt: string(jarr),
-		Role:   "user",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	iter := g.sendMessageStream(text)
-	fmt.Print("\x1b[32m")
-	fmt.Print("A: ")
+func (g *GeminiClient) genTitle() string {
+	// 生成对话标题prompt
+	promtp := "Generate title based on my question, Please give the title directly without any additional explanation or additional characters."
+	iter := g.sendMessageStream(promtp)
 	modelPart := make([]string, 0)
 	for {
 		resp, err := iter.Next()
@@ -83,22 +66,87 @@ func (g *GeminiClient) sendMessageStreamAndPrint(text string, db *DB) {
 			log.Println(err.Error())
 			break
 		}
-		p := fmt.Sprint(resp.Candidates[0].Content.Parts[0])
-		modelPart = append(modelPart, p)
-		fmt.Print(p)
+		if resp != nil &&
+			len(resp.Candidates) > 0 &&
+			resp.Candidates[0].Content != nil &&
+			len(resp.Candidates[0].Content.Parts) > 0 {
+			p := fmt.Sprint(resp.Candidates[0].Content.Parts[0])
+			modelPart = append(modelPart, p)
+		}
 	}
-	fmt.Print("\x1b[0m\n")
-	modelArr, err := json.Marshal(modelPart)
-	if err != nil {
-		log.Fatal(err)
+	return strings.ReplaceAll(strings.Join(modelPart, ""), "*", "")
+}
+
+func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan string, genFlagChan chan bool, db *DB) {
+	firstQuestion := true
+	for {
+		text := <-textChan
+		historyChan <- "[red]Q:" + text + "\n"
+		tx, err := db.SqliteDB.Begin()
+		if err != nil {
+			log.Fatal(err)
+		}
+		userPromptArr := []string{text}
+		jarr, err := json.Marshal(userPromptArr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = db.InsertHistoryWithTX(tx, GeminiChatHistory{
+			ChatID: int64(g.chatID),
+			Prompt: string(jarr),
+			Role:   "user",
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		iter := g.sendMessageStream(text)
+		modelPart := make([]string, 0)
+		historyChan <- "[green]A: "
+		for {
+			resp, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Println(err.Error())
+				break
+			}
+			if resp != nil &&
+				len(resp.Candidates) > 0 &&
+				resp.Candidates[0].Content != nil &&
+				len(resp.Candidates[0].Content.Parts) > 0 {
+				p := fmt.Sprint(resp.Candidates[0].Content.Parts[0])
+				modelPart = append(modelPart, p)
+				historyChan <- p
+			}
+		}
+		historyChan <- "\n"
+		genFlagChan <- false
+		modelArr, err := json.Marshal(modelPart)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = db.InsertHistoryWithTX(tx, GeminiChatHistory{
+			ChatID: int64(g.chatID),
+			Prompt: string(modelArr),
+			Role:   "model",
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		tx.Commit()
+		if firstQuestion {
+			// TODO 插入标题
+			firstQuestion = false
+			go func() {
+				title := g.genTitle()
+				db.InsertChat(GeminiChatList{
+					ChatID:    int64(g.chatID),
+					ChatTitle: title,
+				})
+			}()
+		}
+
 	}
-	err = db.InsertHistoryWithTX(tx, GeminiChatHistory{
-		ChatID: int64(g.chatID),
-		Prompt: string(modelArr),
-		Role:   "model",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	tx.Commit()
 }

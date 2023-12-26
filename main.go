@@ -1,22 +1,23 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
-	"strings"
+
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var HOME_PATH = os.Getenv("HOME")
 var chatID = 1
-var config GeminiChatConfig
 
-func init() {
+func main() {
+	db := initDB()
+	defer db.SqliteDB.Close()
 	// 获取参数
 	if len(os.Args) > 1 {
 		chatIDStr := os.Args[1]
@@ -25,14 +26,23 @@ func init() {
 			log.Fatal(err)
 		}
 		chatID = chatIDTmerl
+	} else {
+		id, err := db.GetLatestChatID()
+		if err != nil {
+			log.Fatal(err)
+		}
+		chatID = id + 1
 	}
-	config = GetConfig()
-}
+	config := GetConfig()
 
-func main() {
+	sendMsgChan := make(chan string)
+	historyChan := make(chan string)
+	genFlagChan := make(chan bool)
+
+	app := tview.NewApplication()
+
 	ctx := context.Background()
-	db := initDB()
-	defer db.SqliteDB.Close()
+
 	geminiClient, err := newGeminiClient(ctx, chatID, config)
 	if err != nil {
 		log.Fatal(err)
@@ -45,12 +55,70 @@ func main() {
 	geminiClient.startChat(history)
 	defer geminiClient.client.Close()
 
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("\x1b[31mQ: ")
-		text, _ := reader.ReadString('\n')
-		fmt.Print("\x1b[0m")
-		text = strings.Replace(text, "\n", "", -1)
-		geminiClient.sendMessageStreamAndPrint(text, db)
+	go geminiClient.sendMessageToTui(sendMsgChan, historyChan, genFlagChan, db)
+
+	chatLog := tview.NewTextView().
+		SetDynamicColors(true).
+		SetRegions(true)
+	chatLog.SetChangedFunc(func() {
+		app.Draw()
+		chatLog.ScrollToEnd()
+	}).SetBorder(true).SetTitle("Chat History <Ctrl-H>")
+
+	go func() {
+		for {
+			history := <-historyChan
+			app.QueueUpdateDraw(func() {
+				chatLog.Write([]byte(history))
+			})
+		}
+	}()
+
+	textArea := tview.NewTextArea()
+	textArea.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyCtrlS {
+			sendMsgChan <- textArea.GetText()
+			genFlagChan <- true
+			textArea.SetText("", true)
+			return nil
+		}
+		return event
+	})
+	textArea.SetBorder(true).SetTitle("Input Message <Ctrl-I>")
+
+	go func() {
+		for {
+			flag := <-genFlagChan
+			if flag {
+				app.SetFocus(chatLog)
+			} else {
+				app.SetFocus(textArea)
+			}
+		}
+	}()
+
+	helpInfo := tview.NewTextView().
+		SetText(" Press Ctrl-S to send message, press Ctrl-C to exit")
+
+	flex := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(chatLog, 0, 8, false).
+		AddItem(textArea, 0, 2, true).
+		AddItem(helpInfo, 1, 0, true)
+
+	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyCtrlH:
+			app.SetFocus(chatLog)
+			return nil
+		case tcell.KeyCtrlI:
+			app.SetFocus(textArea)
+			return nil
+		}
+		return event
+	})
+
+	if err := app.SetRoot(flex, true).Run(); err != nil {
+		panic(err)
 	}
 }

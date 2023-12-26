@@ -22,6 +22,13 @@ type GeminiChatHistory struct {
 	CreateTime string `db:"create_time"`
 }
 
+type GeminiChatList struct {
+	ID         int64  `db:"id"`
+	ChatID     int64  `db:"chat_id"`
+	ChatTitle  string `db:"chat_title"`
+	CreateTime string `db:"create_time"`
+}
+
 type DB struct {
 	SqliteDB *sql.DB
 }
@@ -47,6 +54,17 @@ func initDB() *DB {
 		log.Fatal(err)
 	}
 
+	_, err = sqliteDB.Exec(`CREATE TABLE IF NOT EXISTS gemini_chat_list (
+		id INTEGER PRIMARY KEY,
+		chat_id INTEGER,
+		chat_title TEXT,
+		create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+	)`)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return &DB{
 		SqliteDB: sqliteDB,
 	}
@@ -59,6 +77,22 @@ func (db *DB) InsertHistory(chat GeminiChatHistory) error {
 
 func (db *DB) InsertHistoryWithTX(tx *sql.Tx, chat GeminiChatHistory) error {
 	_, err := tx.Exec(`INSERT INTO gemini_chat_history (chat_id, prompt, role) VALUES (?, ?, ?)`, chat.ChatID, chat.Prompt, chat.Role)
+	return err
+}
+
+func (db *DB) GetLatestChatID() (int, error) {
+	var chatID int
+	err := db.SqliteDB.QueryRow(`SELECT chat_id FROM gemini_chat_list ORDER BY id DESC LIMIT 1`).Scan(&chatID)
+	if err != nil && err.Error() == "sql: no rows in result set" {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	return chatID, nil
+}
+
+func (db *DB) InsertChat(chat GeminiChatList) error {
+	_, err := db.SqliteDB.Exec(`INSERT INTO gemini_chat_list (chat_id, chat_title) VALUES (?, ?)`, chat.ChatID, chat.ChatTitle)
 	return err
 }
 
