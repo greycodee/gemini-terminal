@@ -14,6 +14,7 @@ import (
 
 var HOME_PATH = os.Getenv("HOME")
 var chatID = 1
+var chatHistoryTitle = "Chat History <Ctrl-H>"
 
 func main() {
 	db := initDB()
@@ -38,6 +39,7 @@ func main() {
 	sendMsgChan := make(chan string)
 	historyChan := make(chan string)
 	genFlagChan := make(chan bool)
+	titleChan := make(chan string)
 
 	app := tview.NewApplication()
 
@@ -55,7 +57,7 @@ func main() {
 	geminiClient.startChat(history)
 	defer geminiClient.client.Close()
 
-	go geminiClient.sendMessageToTui(sendMsgChan, historyChan, genFlagChan, db)
+	go geminiClient.sendMessageToTui(sendMsgChan, historyChan, genFlagChan, titleChan, db)
 
 	chatLog := tview.NewTextView().
 		SetDynamicColors(true).
@@ -63,7 +65,7 @@ func main() {
 	chatLog.SetChangedFunc(func() {
 		app.Draw()
 		chatLog.ScrollToEnd()
-	}).SetBorder(true).SetTitle("Chat History <Ctrl-H>")
+	}).SetBorder(true).SetTitle(chatHistoryTitle)
 
 	go func() {
 		for {
@@ -72,6 +74,13 @@ func main() {
 				chatLog.Write([]byte(history))
 			})
 		}
+	}()
+
+	go func() {
+		title := <-titleChan
+		app.QueueUpdateDraw(func() {
+			chatLog.SetTitle(chatHistoryTitle + " [" + title + "]")
+		})
 	}()
 
 	textArea := tview.NewTextArea()
