@@ -14,9 +14,10 @@ import (
 
 var HOME_PATH = os.Getenv("HOME")
 var chatID = 1
-var config GeminiChatConfig
 
-func init() {
+func main() {
+	db := initDB()
+	defer db.SqliteDB.Close()
 	// 获取参数
 	if len(os.Args) > 1 {
 		chatIDStr := os.Args[1]
@@ -25,11 +26,15 @@ func init() {
 			log.Fatal(err)
 		}
 		chatID = chatIDTmerl
+	} else {
+		id, err := db.GetLatestChatID()
+		if err != nil {
+			log.Fatal(err)
+		}
+		chatID = id + 1
 	}
-	config = GetConfig()
-}
+	config := GetConfig()
 
-func main() {
 	sendMsgChan := make(chan string)
 	historyChan := make(chan string)
 	genFlagChan := make(chan bool)
@@ -37,8 +42,7 @@ func main() {
 	app := tview.NewApplication()
 
 	ctx := context.Background()
-	db := initDB()
-	defer db.SqliteDB.Close()
+
 	geminiClient, err := newGeminiClient(ctx, chatID, config)
 	if err != nil {
 		log.Fatal(err)
@@ -59,45 +63,60 @@ func main() {
 	chatLog.SetChangedFunc(func() {
 		app.Draw()
 		chatLog.ScrollToEnd()
-	})
+	}).SetBorder(true).SetTitle("Chat History <Ctrl-H>")
+
 	go func() {
 		for {
 			history := <-historyChan
 			app.QueueUpdateDraw(func() {
 				chatLog.Write([]byte(history))
-				// chatLog.SetText(chatLog.GetText(true) + history)
 			})
 		}
 	}()
 
-	// 创建一个输入框用于输入消息
-	inputField := tview.NewInputField().
-		SetLabel("Enter message: ").
-		SetFieldWidth(0)
-
-		// inputField.SetFieldBackgroundColor(tview.Styles.PrimitiveBackgroundColor).SetEnabled(false)
-
-	// 设置完成函数以处理消息提交
-	inputField.SetDoneFunc(func(key tcell.Key) {
-		if key == tcell.KeyEnter {
-			sendMsgChan <- inputField.GetText()
-			inputField.SetText("")
+	textArea := tview.NewTextArea()
+	textArea.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyCtrlS {
+			sendMsgChan <- textArea.GetText()
 			genFlagChan <- true
+			textArea.SetText("", true)
+			return nil
 		}
+		return event
 	})
+	textArea.SetBorder(true).SetTitle("Input Message <Ctrl-I>")
 
 	go func() {
 		for {
 			flag := <-genFlagChan
-			inputField.SetDisabled(flag)
+			if flag {
+				app.SetFocus(chatLog)
+			} else {
+				app.SetFocus(textArea)
+			}
 		}
 	}()
-	// spinner := tview.NewSpinner('⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷')
-	// 创建一个Flex布局，并设置聊天记录框和输入框的比例为8:1
+
+	helpInfo := tview.NewTextView().
+		SetText(" Press Ctrl-S to send message, press Ctrl-C to exit")
+
 	flex := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(chatLog, 0, 8, false).
-		AddItem(inputField, 1, 2, true)
+		AddItem(textArea, 0, 2, true).
+		AddItem(helpInfo, 1, 0, true)
+
+	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyCtrlH:
+			app.SetFocus(chatLog)
+			return nil
+		case tcell.KeyCtrlI:
+			app.SetFocus(textArea)
+			return nil
+		}
+		return event
+	})
 
 	if err := app.SetRoot(flex, true).Run(); err != nil {
 		panic(err)
