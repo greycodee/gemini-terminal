@@ -86,6 +86,9 @@ func main() {
 	textArea := tview.NewTextArea()
 	textArea.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyCtrlS {
+			if textArea.GetText() == "" {
+				return nil
+			}
 			sendMsgChan <- textArea.GetText()
 			genFlagChan <- true
 			textArea.SetText("", true)
