@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -112,13 +114,56 @@ func main() {
 	helpInfo := tview.NewTextView().
 		SetText(" Press Ctrl-S to send message, press Ctrl-C to exit")
 
+	list := tview.NewList()
+	list.SetBorder(true).SetTitle("Chat List <Ctrl-L>")
+
+	go func() {
+		chatList, err := db.GetChatList()
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, chat := range chatList {
+			if chat.ChatTitle == "" {
+				continue
+			}
+			list.AddItem(chat.ChatTitle, fmt.Sprintf("ChatId:%d", chat.ChatID), rune(0), nil)
+		}
+	}()
+	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEnter {
+			// 渲染history box
+			go func() {
+				_, secondary := list.GetItemText(list.GetCurrentItem())
+				app.SetFocus(textArea)
+				// db.GetChatHistoryByChatId()
+				secs := strings.Split(secondary, ":")
+				chatID, _ := strconv.ParseInt(secs[1], 10, 64)
+				history, err := db.GetChatHistoryByChatId(chatID)
+				if err != nil {
+					log.Fatal(err)
+				}
+				for _, h := range history {
+					if h.Role == "user" {
+						historyChan <- "[red]Q:" + h.Prompt + "\n"
+					} else if h.Role == "model" {
+						historyChan <- "[green]A:" + h.Prompt + "\n"
+					}
+				}
+			}()
+
+			return nil
+		}
+		return event
+	})
 	flex := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(chatLog, 0, 8, false).
-		AddItem(textArea, 0, 2, true).
-		AddItem(helpInfo, 1, 0, true)
+		AddItem(textArea, 0, 2, false).
+		AddItem(helpInfo, 1, 0, false)
 
-	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	appFlex := tview.NewFlex().AddItem(list, 0, 3, true).AddItem(flex, 0, 7, false)
+
+	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyCtrlH:
 			app.SetFocus(chatLog)
@@ -126,11 +171,14 @@ func main() {
 		case tcell.KeyCtrlI:
 			app.SetFocus(textArea)
 			return nil
+		case tcell.KeyCtrlL:
+			app.SetFocus(list)
+			return nil
 		}
 		return event
 	})
 
-	if err := app.SetRoot(flex, true).Run(); err != nil {
+	if err := app.SetRoot(appFlex, true).Run(); err != nil {
 		panic(err)
 	}
 }

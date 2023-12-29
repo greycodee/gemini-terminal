@@ -132,3 +132,51 @@ func parsePrompt(prompt string) []genai.Part {
 	}
 	return promptPart
 }
+
+func (db *DB) GetChatList() ([]GeminiChatList, error) {
+	chatList := make([]GeminiChatList, 0)
+	rows, err := db.SqliteDB.Query(`SELECT id,chat_id,chat_title FROM gemini_chat_list`)
+	if err != nil {
+		return chatList, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var chat_id int64
+		var chat_title string
+
+		err := rows.Scan(&id, &chat_id, &chat_title)
+		if err != nil {
+			return nil, err
+		}
+		chatList = append(chatList, GeminiChatList{
+			ID:        id,
+			ChatID:    chat_id,
+			ChatTitle: chat_title,
+		})
+	}
+	return chatList, nil
+
+}
+
+func (db *DB) GetChatHistoryByChatId(chatId int64) ([]GeminiChatHistory, error) {
+	chatHistoryList := make([]GeminiChatHistory, 0)
+	rows, err := db.SqliteDB.Query(`SELECT prompt,role FROM gemini_chat_history WHERE chat_id = ?`, chatId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var prompt string
+		var role string
+		err := rows.Scan(&prompt, &role)
+		if err != nil {
+			return nil, err
+		}
+		chatHistoryList = append(chatHistoryList, GeminiChatHistory{
+			Prompt: prompt,
+			Role:   role,
+		})
+	}
+	return chatHistoryList, nil
+}
