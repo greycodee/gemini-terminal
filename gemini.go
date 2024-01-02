@@ -21,7 +21,9 @@ type GeminiClient struct {
 	conf        GeminiChatConfig
 }
 
-func newGeminiClient(ctx context.Context, chatID int, conf GeminiChatConfig) (*GeminiClient, error) {
+func newGeminiClient() (*GeminiClient, error) {
+	conf := GetConfig()
+	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(conf.GoogleAIKey))
 	if err != nil {
 		return nil, err
@@ -29,7 +31,6 @@ func newGeminiClient(ctx context.Context, chatID int, conf GeminiChatConfig) (*G
 	model := client.GenerativeModel(conf.ModelName)
 	model.SafetySettings = conf.SafetySetting
 	return &GeminiClient{
-		chatID: chatID,
 		client: client,
 		ctx:    ctx,
 		conf:   conf,
@@ -74,10 +75,10 @@ func (g *GeminiClient) genTitle() string {
 			modelPart = append(modelPart, p)
 		}
 	}
-	return strings.ReplaceAll(strings.Join(modelPart, ""), "*", "")
+	return strings.ReplaceAll(strings.ReplaceAll(strings.Join(modelPart, ""), "*", ""), "\n", "")
 }
 
-func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan string, genFlagChan chan bool, titleChan chan string, db *DB) {
+func (g *GeminiClient) sendMessageToTui(textChan chan string, historyChan chan string, db *DB) {
 	firstQuestion := true
 	for {
 		text := <-textChan

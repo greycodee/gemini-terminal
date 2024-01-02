@@ -21,7 +21,21 @@ type GeminiTui struct {
 	db              *DB
 }
 
-func NewGeminiTui(chatHistoryChan, sendMsgChan chan string, db *DB) GeminiTui {
+func NewGeminiTui(chatHistoryChan, sendMsgChan chan string) GeminiTui {
+	// TODO init db
+	// TODO init geminiClient
+	db := initDB()
+	geminiClient, err := newGeminiClient()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	history, err := db.GetByChatID(chatID)
+	if err != nil {
+		log.Fatal(err)
+	}
+	geminiClient.startChat(history)
+
 	tuiApp := tview.NewApplication()
 	geminiTui := GeminiTui{
 		TuiApp:          tuiApp,
@@ -32,7 +46,24 @@ func NewGeminiTui(chatHistoryChan, sendMsgChan chan string, db *DB) GeminiTui {
 	geminiTui.TuiApp.SetInputCapture(geminiTui.moveWindowsFocus)
 	geminiTui.drawTui()
 
+	// TODO init data
+	geminiTui.initData()
 	return geminiTui
+}
+
+func (tui *GeminiTui) initData() {
+	go func() {
+		chatList, err := tui.db.GetChatList()
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, chat := range chatList {
+			if chat.ChatTitle == "" {
+				continue
+			}
+			tui.ChatListUI.AddItem(chat.ChatTitle, fmt.Sprintf("ChatId:%d", chat.ChatID), rune(0), nil)
+		}
+	}()
 }
 
 func (tui *GeminiTui) Run() {
@@ -149,6 +180,7 @@ func (tui *GeminiTui) handlerChatListUIKeyEvent(event *tcell.EventKey) *tcell.Ev
 func (tui *GeminiTui) handlerChatInputUIKeyEvent(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyCtrlS:
+		// TODO publish message
 		if tui.ChatInputUI.GetText() == "" {
 			return nil
 		}
